@@ -11,13 +11,6 @@ require 'hdf5'
 cjson=require('cjson') 
 require 'xlua'
 
--- local imports
-local utils = require 'misc.utils'
-require 'misc.DataLoader'
-require 'misc.LanguageModel'
-local net_utils = require 'misc.net_utils'
-require 'misc.optim_updates'
-
 -------------------------------------------------------------------------------
 -- Input arguments and options
 -------------------------------------------------------------------------------
@@ -28,7 +21,6 @@ cmd:option('-input_json','data_prepro.json','path to the json file containing vo
 cmd:option('-image_root','','path to the image root')
 cmd:option('-cnn_proto', '', 'path to the cnn prototxt')
 cmd:option('-cnn_model', '', 'path to the cnn model')
-cmd:option('-start_from', '', 'path to a model checkpoint to initialize model weights from. Empty = don\'t')
 cmd:option('-batch_size', 10, 'batch_size')
 
 cmd:option('-out_name', 'data_img.h5', 'output name')
@@ -39,25 +31,9 @@ opt = cmd:parse(arg)
 print(opt)
 
 cutorch.setDevice(opt.gpuid)
-if string.len(opt.start_from) > 0 then
-	-- load protos from file
-	print('initializing weights from ' .. opt.start_from)
-	local loaded_checkpoint = torch.load(opt.start_from)
-	proto = loaded_checkpoint.protos
-	net_utils.unsanitize_gradients(proto.cnn)
-    net = proto.cnn
-	net:evaluate()
-	net:cuda()
-	--local lm_modules = net.lm:getModulesList()
---	for k,v in pairs(lm_modules) do net_utils.unsanitize_gradients(v) end
---	for k,v in pairs(net) do v:cuda() end
-else
-	net=loadcaffe.load(opt.cnn_proto, opt.cnn_model,opt.backend);
-	net:evaluate()
-	net=net:cuda()
-end
---print(net.modules[26].name)
---print(net.modules[27].name)
+net=loadcaffe.load(opt.cnn_proto, opt.cnn_model,opt.backend);
+net:evaluate()
+net=net:cuda()
 
 function loadim(imname)
     im=image.load(imname)
@@ -108,8 +84,7 @@ for i=1,sz,batch_size do
         ims[j]=loadim(train_list[i+j-1]):cuda()
     end
     net:forward(ims)
-    feat_train[{{i,r},{}}]=net.modules[19].output:clone()
-    --feat_train[{{i,r},{}}]=net.modules[43].output:clone()
+    feat_train[{{i,r},{}}]=net.modules[43].output:clone()
     collectgarbage()
 end
 
@@ -125,8 +100,7 @@ for i=1,sz,batch_size do
         ims[j]=loadim(test_list[i+j-1]):cuda()
     end
     net:forward(ims)
-    feat_test[{{i,r},{}}]=net.modules[19].output:clone()
-    --feat_test[{{i,r},{}}]=net.modules[43].output:clone()
+    feat_test[{{i,r},{}}]=net.modules[43].output:clone()
     collectgarbage()
 end
 

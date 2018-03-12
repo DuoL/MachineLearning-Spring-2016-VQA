@@ -1,7 +1,3 @@
------author: VQA
------modified by jia wang
------Apr/30/2016
-
 require 'nn'
 require 'torch'
 require 'nngraph'
@@ -33,7 +29,6 @@ cmd:option('-learning_rate',3e-4,'learning rate for rmsprop')
 cmd:option('-learning_rate_decay_start', -1, 'at what iteration to start decaying learning rate? (-1 = dont)')
 cmd:option('-learning_rate_decay_every', 50000, 'every how many iterations thereafter to drop LR by half?')
 cmd:option('-batch_size',500,'batch_size for each iterations')
-cmd:option('-val_num',500,'val_size for 1000 iterations')
 cmd:option('-max_iters', 150000, 'max number of iterations to run for ')
 cmd:option('-input_encoding_size', 200, 'he encoding size of each token in the vocabulary')
 cmd:option('-rnn_size',512,'size of the rnn in number of hidden nodes in each layer')
@@ -97,7 +92,6 @@ local h5_file = hdf5.open(opt.input_ques_h5, 'r')
 dataset['question'] = h5_file:read('/ques_train'):all()
 dataset['lengths_q'] = h5_file:read('/ques_length_train'):all()
 dataset['img_list'] = h5_file:read('/img_pos_train'):all()
-dataset['img_vc_list'] = h5_file:read('/img_pos_vc'):all()
 dataset['answers'] = h5_file:read('/answers'):all()
 h5_file:close()
 
@@ -105,7 +99,6 @@ h5_file:close()
 print('DataLoader loading h5 file: ', opt.input_img_h5)
 local h5_file = hdf5.open(opt.input_img_h5, 'r')
 dataset['fv_im'] = h5_file:read('/images_train'):all()
-dataset['fv_im_vc'] = h5_file:read('/images_vc'):all()
 h5_file:close()
 
 dataset['question'] = right_align(dataset['question'],dataset['lengths_q'])
@@ -319,87 +312,8 @@ for iter = 1, opt.max_iters do
 	if iter%50 == 0 then -- change this to smaller value if out of the memory
 		collectgarbage()
 	end
-
-	if (iter % 1000 == 0 ) then
-
-    	-- evaluate the validation performance
-    	local val_loss, val_predictions, lang_stats = eval_split('val', {val_images_use = opt.val_images_use})
-    	print('validation loss: ', val_loss)
-    	print(lang_stats)
-    	val_loss_history[iter] = val_loss
-    	if lang_stats then
-    	  val_lang_stats_history[iter] = lang_stats
-    	end
-
-    	local checkpoint_path = path.join(opt.checkpoint_path, 'model_id' .. opt.id)
-	end
-
 end
 
 -- Saving the final model
 torch.save(string.format(model_path..'lstm.t7',i),
 	{encoder_w_q=encoder_w_q,embedding_w_q=embedding_w_q,multimodal_w=multimodal_w}) 
-
--------------------------------------------------------------------------------
--- Validation evaluation
--------------------------------------------------------------------------------
-local function eval_split(split, evalopt)
-  local verbose = utils.getopt(evalopt, 'verbose', true)
-  local val_images_use = utils.getopt(evalopt, 'val_images_use', true)
-
-  local n = 0
-  local loss_sum = 0
-  local loss_evals = 0
-  local predictions = {}
-  local vocab = loader:getVocab()
-  while true do
-
-	-----------------------------------------------------------------------
-	-- Do Prediction
-	-----------------------------------------------------------------------
-	nqs=dataset['question']:size(1);
-	scores=torch.Tensor(nqs,noutput);
-	qids=torch.LongTensor(nqs);
-	for i=1,nqs,batch_size do
-	    xlua.progress(i, nqs)
-	    r=math.min(i+batch_size-1,nqs);
-	    scores[{{i,r},{}}],qids[{{i,r}}]=forward(i,r);
-	end
-	
-	tmp,pred=torch.max(scores,2);
-
-
-	mc_response={};
-
-	for i=1,nqs do
-	    local mc_prob = {}
-	    local mc_idx = dataset['vc_answers'][i]
-	    local tmp_idx = {}
-	    for j=1, mc_idx:size()[1] do
-	        if mc_idx[j] ~= 0 then
-	            table.insert(mc_prob, scores[{i, mc_idx[j]}])
-	            table.insert(tmp_idx, mc_idx[j])
-	        end
-	    end
-	    local tmp,tmp2=torch.max(torch.Tensor(mc_prob), 1);
-	    table.insert(mc_response, {question_id=qids[i],answer=json_file['ix_to_ans'][tostring(tmp_idx[tmp2[1]])]})
-	end
-
-    -- if we wrapped around the split or used up val imgs budget then bail
-    local ix0 = data.bounds.it_pos_now
-    local ix1 = math.min(data.bounds.it_max, val_images_use)
-    if verbose then
-      print(string.format('evaluating validation performance... %d/%d (%f)', ix0-1, ix1, loss))
-    end
-
-    if loss_evals % 10 == 0 then collectgarbage() end
-    if data.bounds.wrapped then break end -- the split ran out of data, lets break out
-    if n >= val_images_use then break end -- we've used enough images
-
-  local lang_stats
-  if opt.language_eval == 1 then
-    lang_stats = net_utils.language_eval(predictions, opt.id)
-  end
-
-  return loss_sum/loss_evals, predictions, lang_stats
-end
