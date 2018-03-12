@@ -30,7 +30,7 @@ Accuracy > 70%
 # Background
 Alex K. Et al.***[1]*** firstly accomplished the deep-level convolutional neuron network, after that Y.jia Et al.***[2]*** made it possible to Use Caffe deep learning framework to accelerate the optimization of the model, Stanislaw A. Et al.***[3]*** Combined image encoding and NLP to accomplish VQA including the result of extracting the semantics of image made by Lawrence et al.***[4]***
 # Approach
-* Our basic VQA model is according to VQA, the only modification depends on special case of this project---abstract images and ‘yes’ or ‘no’ answers. 
+* Our basic VQA model is according to VQA, the only modification depends on special case of this project---abstract images and ‘yes’ or ‘no’ answers.  
 * The CNN we used for image encoding is a simplification of [VGG\_CNN\_F](https://gist.github.com/ksimonyan/a32c9063ec8e1118221a#file-readme-md)***[5]*** which has the same structure as Alexnet, but here, we made a little difference.
 * The CNN model consists of 5-layer convolutional neuron network, 3 max pooling layers and 2 full-connected layers. 
 	* The core of the first layer is 11×11, the stride is 4, and the total cores are 64. 
